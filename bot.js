@@ -2,9 +2,9 @@ require("dotenv").config();
 const TelegramBot = require("node-telegram-bot-api");
 const { findProduct, allProductsSummary } = require("./products");
 
-const TOKEN = process.env.BOT_TOKEN;
+const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 if (!TOKEN) {
-  console.error("❌ BOT_TOKEN олдсонгүй. .env файлаа шалгана уу.");
+  console.error("❌ TELEGRAM_BOT_TOKEN олдсонгүй. .env файлаа шалгана уу.");
   process.exit(1);
 }
 

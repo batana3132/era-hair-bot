@@ -1,0 +1,65 @@
+require("dotenv").config();
+const https = require("https");
+
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
+
+function sendTelegramMessage(text) {
+  return new Promise((resolve) => {
+    if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
+      console.warn("⚠️ Telegram тохиргоо дутуу байна (TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID).");
+      return resolve();
+    }
+
+    const body = JSON.stringify({
+      chat_id: TELEGRAM_CHAT_ID,
+      text,
+      parse_mode: "HTML",
+    });
+
+    const options = {
+      hostname: "api.telegram.org",
+      path: `/bot${TELEGRAM_BOT_TOKEN}/sendMessage`,
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Content-Length": Buffer.byteLength(body),
+      },
+    };
+
+    const req = https.request(options, (res) => {
+      res.on("data", () => {});
+      res.on("end", resolve);
+    });
+
+    req.on("error", (err) => {
+      console.error("Telegram алдаа:", err.message);
+      resolve();
+    });
+
+    req.write(body);
+    req.end();
+  });
+}
+
+async function sendOrderNotification({ userId, userName, message }) {
+  const text =
+    `🛍️ <b>Шинэ захиалга!</b>\n\n` +
+    `👤 Хэрэглэгч: ${userName || "Тодорхойгүй"}\n` +
+    `🆔 Facebook ID: ${userId}\n` +
+    `💬 Мессеж:\n${message}\n\n` +
+    `⏰ ${new Date().toLocaleString("mn-MN")}`;
+  await sendTelegramMessage(text);
+}
+
+async function sendComplaintAlert({ userId, userName, message }) {
+  const text =
+    `⚠️ <b>Гомдол / Санал хүсэлт!</b>\n\n` +
+    `👤 Хэрэглэгч: ${userName || "Тодорхойгүй"}\n` +
+    `🆔 Facebook ID: ${userId}\n` +
+    `💬 Мессеж:\n${message}\n\n` +
+    `⏰ ${new Date().toLocaleString("mn-MN")}`;
+  await sendTelegramMessage(text);
+}
+
+module.exports = { sendOrderNotification, sendComplaintAlert };
