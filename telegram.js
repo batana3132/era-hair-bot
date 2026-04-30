@@ -62,4 +62,4 @@ async function sendComplaintAlert({ userId, userName, message }) {
   await sendTelegramMessage(text);
 }
 
-module.exports = { sendOrderNotification, sendComplaintAlert };
+module.exports = { sendTelegramMessage, sendOrderNotification, sendComplaintAlert };

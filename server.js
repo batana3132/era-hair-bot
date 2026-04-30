@@ -1,8 +1,7 @@
 require("dotenv").config();
 const express = require("express");
 const https = require("https");
-const { chat, isOrderIntent, isComplaintIntent } = require("./chatbot");
-const { sendOrderNotification, sendComplaintAlert } = require("./telegram");
+const { chat } = require("./chatbot");
 
 const app = express();
 app.use(express.json());
@@ -47,14 +46,7 @@ app.post("/webhook", async (req, res) => {
           ? `${userProfile.first_name || ""} ${userProfile.last_name || ""}`.trim()
           : null;
 
-        // Notify admin on Telegram for orders and complaints
-        if (isOrderIntent(messageText)) {
-          await sendOrderNotification({ userId: senderId, userName, message: messageText });
-        } else if (isComplaintIntent(messageText)) {
-          await sendComplaintAlert({ userId: senderId, userName, message: messageText });
-        }
-
-        const reply = await chat(senderId, messageText);
+        const reply = await chat(senderId, messageText, { userId: senderId, userName });
         await sendFBMessage(senderId, reply);
       } catch (err) {
         console.error(`[${senderId}] Алдаа:`, err.message);
