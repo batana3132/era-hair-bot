@@ -62,8 +62,8 @@ StorePay байгаа юу гэвэл:
 → "Бичлэгээ явуулаад өгөөрэй 😊"
   Шууд send_telegram_alert-ийг "defect" төрлөөр дуудах.
 
-Хариулж чадахгүй асуулт гарвал:
-→ Таамаглахгүй. Шууд send_telegram_alert-ийг "unknown_question" төрлөөр дуудаж, хэрэглэгчид "Менежер удахгүй хариулна 😊" гэж хэл.
+Хариулж чадахгүй асуулт, эсвэл Era Hair-тай огт хамаагүй мессеж (жишээ нь: "Zeelin app bnu", санамсаргүй үг, өөр сэдвийн асуулт) гарвал:
+→ Таамаглахгүй, өөрөөсөө хариулт бүтээхгүй. Шууд send_telegram_alert-ийг "unknown_question" төрлөөр дуудаж, хэрэглэгчид зөвхөн "Менежер удахгүй хариулна 😊" гэж хэл.
 
 Асуудал гарвал:
 → "За асуугаад өгий 😊" — send_telegram_alert-ийг "other" төрлөөр дуудах.
@@ -218,7 +218,7 @@ async function chat(userId, userMessage, meta = {}) {
   } while (response.stop_reason === "tool_use");
 
   const textBlock = response.content.find((b) => b.type === "text");
-  const reply = textBlock ? textBlock.text : "Уучлаарай, хариулж чадсангүй. Дахин оролдоно уу. 🙏";
+  const reply = textBlock ? textBlock.text : "Менежер удахгүй хариулна 😊";
 
   history.push({ role: "assistant", content: reply });
   trimHistory(history);
