@@ -3,6 +3,10 @@ const express = require("express");
 const https = require("https");
 const { chat } = require("./chatbot");
 
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
+const TELEGRAM_WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET || "";
+
 const app = express();
 app.use(express.json());
 
@@ -120,6 +124,75 @@ function sendFBMessage(recipientId, text) {
     req.end();
   });
 }
+
+// Human takeover — owner replies to a Telegram alert → message forwarded to Facebook customer
+app.post("/telegram-reply", (req, res) => {
+  const secret = req.headers["x-telegram-bot-api-secret-token"];
+  if (TELEGRAM_WEBHOOK_SECRET && secret !== TELEGRAM_WEBHOOK_SECRET) {
+    return res.sendStatus(403);
+  }
+
+  res.sendStatus(200); // respond immediately so Telegram doesn't retry
+
+  const message = req.body && req.body.message;
+  if (!message || !message.reply_to_message || !message.text) return;
+
+  // Only accept replies from the configured owner chat
+  if (String(message.chat.id) !== String(TELEGRAM_CHAT_ID)) return;
+
+  const originalText = message.reply_to_message.text || "";
+  const fbIdMatch = originalText.match(/FBID: ([^\n]+)/);
+  if (!fbIdMatch) return;
+
+  const fbSenderId = fbIdMatch[1].trim();
+  const replyText = message.text;
+
+  sendFBMessage(fbSenderId, replyText).catch((err) => {
+    console.error("Human takeover send error:", err.message);
+  });
+});
+
+// Register Telegram webhook — call this once after deployment
+// Requires APP_URL env variable set to your public server URL (e.g. https://era-hair-bot.onrender.com)
+app.get("/set-telegram-webhook", (req, res) => {
+  const appUrl = process.env.APP_URL;
+  if (!appUrl) {
+    return res.status(400).json({ error: "APP_URL env variable тохируулаагүй байна." });
+  }
+
+  const webhookUrl = `${appUrl}/telegram-reply`;
+  const body = JSON.stringify({
+    url: webhookUrl,
+    secret_token: TELEGRAM_WEBHOOK_SECRET || undefined,
+  });
+
+  const options = {
+    hostname: "api.telegram.org",
+    path: `/bot${TELEGRAM_BOT_TOKEN}/setWebhook`,
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Content-Length": Buffer.byteLength(body),
+    },
+  };
+
+  const tgReq = https.request(options, (tgRes) => {
+    let data = "";
+    tgRes.on("data", (chunk) => (data += chunk));
+    tgRes.on("end", () => {
+      try {
+        const result = JSON.parse(data);
+        res.json({ webhookUrl, telegram: result });
+      } catch {
+        res.json({ webhookUrl, raw: data });
+      }
+    });
+  });
+
+  tgReq.on("error", (err) => res.status(500).json({ error: err.message }));
+  tgReq.write(body);
+  tgReq.end();
+});
 
 app.listen(PORT, () => {
   console.log(`✅ Era Hair Bot сервер ажиллаж байна: http://localhost:${PORT}`);

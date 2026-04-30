@@ -177,7 +177,7 @@ async function handleTool(name, input, meta) {
         `⏰ ${ts}`;
   }
 
-  await sendTelegramMessage(text);
+  await sendTelegramMessage(text, id !== "-" ? id : null);
   return "Telegram-д мэдэгдэл явуулсан.";
 }
 

@@ -4,16 +4,20 @@ const https = require("https");
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
-function sendTelegramMessage(text) {
+function sendTelegramMessage(text, fbSenderId = null) {
   return new Promise((resolve) => {
     if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
       console.warn("⚠️ Telegram тохиргоо дутуу байна (TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID).");
       return resolve();
     }
 
+    const fullText = fbSenderId
+      ? `${text}\n\n🔗 FBID: ${fbSenderId}\n💬 Reply to this message to respond to customer directly`
+      : text;
+
     const body = JSON.stringify({
       chat_id: TELEGRAM_CHAT_ID,
-      text,
+      text: fullText,
       parse_mode: "HTML",
     });
 
