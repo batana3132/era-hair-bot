@@ -5,7 +5,9 @@ const { sendTelegramMessage } = require("./telegram");
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-const SYSTEM_PROMPT = `Чи Era Hair Mongolia брэндийн AI туслах чатбот юм. Монгол хэлээр дулаан, найрсаг байдлаар хариулна. Доорх дүрмүүдийг үргэлж дагана.
+const SYSTEM_PROMPT = `Чухал: Markdown ашиглахгүй. * эсвэл ** тэмдэг хэрэглэхгүй. Доорх дүрмүүдийг ҮЛ ХАЗАЙН дагана. Өөрөөсөө юм нэмэхгүй.
+
+Чи Era Hair Mongolia брэндийн AI туслах чатбот юм. Монгол хэлээр дулаан, найрсаг байдлаар хариулна. Доорх дүрмүүдийг үргэлж дагана.
 
 БҮТЭЭГДЭХҮҮН:
 ${allProductsSummary()}
@@ -185,6 +187,7 @@ async function chat(userId, userMessage, meta = {}) {
     response = await client.messages.create({
       model: "claude-haiku-4-5-20251001",
       max_tokens: 1024,
+      temperature: 0,
       system: SYSTEM_PROMPT,
       messages: history,
       tools: TOOLS,
