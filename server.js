@@ -2,6 +2,8 @@ require("dotenv").config();
 const express = require("express");
 const https = require("https");
 const { chat } = require("./chatbot");
+const { getSettings, saveSettings } = require("./settings");
+const { sendTelegramMessage } = require("./telegram");
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
@@ -125,7 +127,7 @@ function sendFBMessage(recipientId, text) {
   });
 }
 
-// Human takeover — owner replies to a Telegram alert → message forwarded to Facebook customer
+// Telegram webhook — handles owner commands (/on, /off, etc.) and human takeover replies
 app.post("/telegram-reply", (req, res) => {
   const secret = req.headers["x-telegram-bot-api-secret-token"];
   if (TELEGRAM_WEBHOOK_SECRET && secret !== TELEGRAM_WEBHOOK_SECRET) {
@@ -135,22 +137,104 @@ app.post("/telegram-reply", (req, res) => {
   res.sendStatus(200); // respond immediately so Telegram doesn't retry
 
   const message = req.body && req.body.message;
-  if (!message || !message.reply_to_message || !message.text) return;
+  if (!message || !message.text) return;
 
-  // Only accept replies from the configured owner chat
+  // Only accept messages from the configured owner chat
   if (String(message.chat.id) !== String(TELEGRAM_CHAT_ID)) return;
+
+  const text = message.text.trim();
+
+  // Handle owner commands
+  if (text.startsWith("/")) {
+    handleOwnerCommand(text).catch((err) => {
+      console.error("Command error:", err.message);
+    });
+    return;
+  }
+
+  // Human takeover — owner replies to a notification → forward to Facebook customer
+  if (!message.reply_to_message) return;
 
   const originalText = message.reply_to_message.text || "";
   const fbIdMatch = originalText.match(/FBID: ([^\n]+)/);
   if (!fbIdMatch) return;
 
   const fbSenderId = fbIdMatch[1].trim();
-  const replyText = message.text;
-
-  sendFBMessage(fbSenderId, replyText).catch((err) => {
+  sendFBMessage(fbSenderId, text).catch((err) => {
     console.error("Human takeover send error:", err.message);
   });
 });
+
+async function handleOwnerCommand(text) {
+  // Strip /command@botname format Telegram sometimes uses
+  const parts = text.split(/\s+/);
+  const cmd = parts[0].toLowerCase().replace(/@\S+$/, "");
+  const args = parts.slice(1);
+
+  const settings = getSettings();
+  let reply;
+
+  switch (cmd) {
+    case "/on":
+      settings.enabled = true;
+      saveSettings(settings);
+      reply = "Bot: ON ✅";
+      break;
+
+    case "/off":
+      settings.enabled = false;
+      saveSettings(settings);
+      reply = "Bot: OFF 🔴";
+      break;
+
+    case "/status":
+      reply = settings.enabled ? "Bot: ON ✅" : "Bot: OFF 🔴";
+      break;
+
+    case "/instruction": {
+      const instruction = args.join(" ");
+      if (!instruction) {
+        reply = "❌ Дүрэм текст оруулна уу.\nЖишээ: /instruction Хэрэглэгч хямдрал асуувал 10% хямдрал олго";
+        break;
+      }
+      settings.instructions.push(instruction);
+      saveSettings(settings);
+      reply = `✅ Дүрэм нэмэгдлээ (#${settings.instructions.length}):\n"${instruction}"`;
+      break;
+    }
+
+    case "/price": {
+      const name = args[0];
+      const price = args.slice(1).join(" ");
+      if (!name || !price) {
+        reply = "❌ Формат: /price [нэр] [үнэ]\nЖишээ: /price curling-wand 45000₮";
+        break;
+      }
+      settings.products[name] = price;
+      saveSettings(settings);
+      reply = `✅ Үнэ шинэчлэгдлээ:\n${name}: ${price}`;
+      break;
+    }
+
+    case "/add": {
+      const name = args[0];
+      const info = args.slice(1).join(" ");
+      if (!name) {
+        reply = "❌ Формат: /add [нэр] [мэдээлэл]\nЖишээ: /add curling-wand 45000₮ - 4 насадка";
+        break;
+      }
+      settings.products[name] = info || "";
+      saveSettings(settings);
+      reply = `✅ Бүтээгдэхүүн нэмэгдлээ:\n${name}: ${info || "(мэдээлэл байхгүй)"}`;
+      break;
+    }
+
+    default:
+      return; // Unknown command — ignore silently
+  }
+
+  await sendTelegramMessage(reply);
+}
 
 // Register Telegram webhook — call this once after deployment
 // Requires APP_URL env variable set to your public server URL (e.g. https://era-hair-bot.onrender.com)

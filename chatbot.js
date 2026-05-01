@@ -1,12 +1,13 @@
 require("dotenv").config();
 const Anthropic = require("@anthropic-ai/sdk");
 const { sendTelegramMessage } = require("./telegram");
+const { getSettings } = require("./settings");
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-const SYSTEM_PROMPT = `Чи Era Hair Mongolia дэлгүүрийн захиалга боловсруулах туслах юм. Монгол хэлээр хариулна. Markdown ашиглахгүй.
+const BASE_PROMPT = `Чи Era Hair Mongolia дэлгүүрийн захиалга боловсруулах туслах юм. Монгол хэлээр хариулна. Markdown ашиглахгүй.
 
-ЗӨВХӨН доорх 10 тохиолдолд хариулна. Бусад бүх тохиолдолд хариулт ӨГӨХГҮЙ.
+ЗӨВХӨН доорх тохиолдолд хариулна. Бусад бүх тохиолдолд хариулт ӨГӨХГҮЙ.
 
 ━━━ ХАРИУЛАХ ТОХИОЛДЛУУД ━━━
 
@@ -51,6 +52,26 @@ IBAN: 790005005312020642
 Мэндчилгээ, бүтээгдэхүүний асуулт, үнийн асуулт, хэрхэн ашиглах, харьцуулалт, санамсаргүй мессеж болон ДУРЫН өөр зүйл:
 → send_telegram_alert-ийг "unhandled" төрлөөр дуудах. message талбарт хэрэглэгчийн мессежийг бүтнээр нь оруулах.
 → ХЭРЭГЛЭГЧИД ЯМАР Ч ТЕКСТ ХАРИУЛТ ӨГӨХГҮЙ. Tool дуудсаны дараа бүрэн зогс. Текст гаргахгүй.`;
+
+function buildSystemPrompt(settings) {
+  let prompt = BASE_PROMPT;
+
+  if (settings.products && Object.keys(settings.products).length > 0) {
+    prompt += "\n\n━━━ БҮТЭЭГДЭХҮҮН / ҮНЭ ━━━\n";
+    for (const [name, info] of Object.entries(settings.products)) {
+      prompt += `• ${name}: ${info}\n`;
+    }
+  }
+
+  if (settings.instructions && settings.instructions.length > 0) {
+    prompt += "\n\n━━━ НЭМЭЛТ ДҮРМҮҮД (эдгээрийг заавал дагана) ━━━\n";
+    settings.instructions.forEach((inst, i) => {
+      prompt += `${i + 1}. ${inst}\n`;
+    });
+  }
+
+  return prompt;
+}
 
 const TOOLS = [
   {
@@ -155,9 +176,14 @@ async function handleTool(name, input, meta) {
 }
 
 async function chat(userId, userMessage, meta = {}) {
+  const settings = getSettings();
+  if (!settings.enabled) return null;
+
   const history = getHistory(userId);
   history.push({ role: "user", content: userMessage });
   trimHistory(history);
+
+  const systemPrompt = buildSystemPrompt(settings);
 
   let response;
   do {
@@ -165,7 +191,7 @@ async function chat(userId, userMessage, meta = {}) {
       model: "claude-haiku-4-5-20251001",
       max_tokens: 512,
       temperature: 0,
-      system: SYSTEM_PROMPT,
+      system: systemPrompt,
       messages: history,
       tools: TOOLS,
     });
