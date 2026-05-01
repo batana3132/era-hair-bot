@@ -51,7 +51,7 @@ app.post("/webhook", async (req, res) => {
           : null;
 
         const reply = await chat(senderId, messageText, { userId: senderId, userName });
-        await sendFBMessage(senderId, reply);
+        if (reply) await sendFBMessage(senderId, reply);
       } catch (err) {
         console.error(`[${senderId}] Алдаа:`, err.message);
         await sendFBMessage(
